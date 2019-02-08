@@ -18,6 +18,10 @@ Crow is built as an Electron app, utilizting HTML, JavaScript, Node.js
 and CSS. The only external dependency is `pdftk`, which handles PDF
 manipulation. To install on macOS 10.11-10.13, use [this link](https://www.pdflabs.com/tools/pdftk-the-pdf-toolkit/pdftk_server-2.02-mac_osx-10.11-setup.pkg).
 
+To create new versions of the production Crow application, run `npm
+install -g electron-packager` and then `electron-packager .` while
+inside of the Git respository.
+
 ### Configuration
 
 Crow contains three configuratio variables:
