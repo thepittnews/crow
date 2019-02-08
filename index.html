@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="UTF-8">
+    <title>The Crow</title>
+    <link href="https://stackpath.bootstrapcdn.com/bootstrap/4.2.1/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-GJzZqFGwb1QTTN6wy59ffF1BuGJpLSa9DkKMp0DgiMDm4iYMj70gZWKYbI706tWS" crossorigin="anonymous">
+    <link rel="stylesheet" href="https://use.fontawesome.com/releases/v5.6.3/css/all.css" integrity="sha384-UHRtZLI+pbxtHCWp1t77Bi1L4ZtiqrqD80Kn4Z8NTSRyMA2Fd33n5dQ8lWUE00s/" crossorigin="anonymous">
+  </head>
+  <body>
+    <div class="container">
+      <div class="jumbotron">
+        <h1 style="font-size: 3em;">
+          <i class="fas fa-crow"></i> Crow
+        </h1>
+
+        <h5>
+          <small class="text-muted"><i>cathy crow voice: squawk squawk, bitch. get yinz's pages in by 1 a.m.!</i></small>
+        </h5>
+
+        <br>
+
+        <ul class="list-group"></ul>
+
+        <br><br>
+
+        <div id="sendStatus"></div>
+
+        <!--We are using node <script>document.write(process.versions.node)</script>,
+        Chrome <script>document.write(process.versions.chrome)</script>,
+        and Electron <script>document.write(process.versions.electron)</script>.-->
+      </div>
+    </div>
+
+    <div style="text-align: center;">
+      <p>If something breaks, send a Slack to Jon.</p>
+    </div>
+
+    <script>require("./renderer");</script>
+  </body>
+</html>

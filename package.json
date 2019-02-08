@@ -1,0 +1,16 @@
+{
+  "name": "crow",
+  "productName": "Crow",
+  "version": "0.1.0",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron ."
+  },
+  "devDependencies": {
+    "electron": "^4.0.2"
+  },
+  "dependencies": {
+    "ftp": "^0.3.10",
+    "request": "^2.88.0"
+  }
+}

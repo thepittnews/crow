@@ -1,0 +1,5 @@
+.DS_Store
+*.pdf
+config.json
+Crow-darwin-x64/
+node_modules/
