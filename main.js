@@ -50,10 +50,10 @@ function pdftk(command) {
 
 function getPdfPath(dateSerialized, pageNumber) {
   const [year, month, day] = dateSerialized.split('-');
-  var page = '';
 
+  var page = '';
   if (pageNumber) {
-    page = `.${pageNumber}`
+    page = `.${pageNumber}`;
   }
 
   return `${config.path}/${month}-${day}-${year.substr(-2)}.PN_A${page}.pdf`;
@@ -112,8 +112,10 @@ function sendPages(args, sendClientAlert) {
   //var c = new Client();
   //c.on('ready', function() {
     for(var i = 1; i <= pageNumbers; i++) {
-      //var filename = getPdfPath(args.dateSerialized, i);
-      //c.put(filename, filename, function(e) {
+      //var originFilename = getPdfPath(args.dateSerialized, i);
+      //var destFilename = originFilename.split("/");
+      //destFilename = destFilename[destFilename.length - 1];
+      //c.put(originFilename, destFilename, function(e) {
         //if (e) {
           //sendClientAlert({ taskName: `> Sending page ${i}`, status: 'fail' });
           //sendClientAlert({ taskName: `ERROR: ${e}`, status: 'fail' });
@@ -130,7 +132,7 @@ function sendPages(args, sendClientAlert) {
     }
   //});
 
-  //c.connect({ host: '', port: '', user: '', password: '' });
+  //c.connect({ host: config.ftp_host, port: '', user: config.ftp_user, password: config.ftp_password });
   //c.on('end', () => {
     sendClientAlert({ taskName: `Sending ${pageNumbers} pages to printer`, status: 'success' });
 
