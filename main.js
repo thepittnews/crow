@@ -20,7 +20,7 @@ function createWindow() {
     // when you should delete the corresponding element.
     win = null;
   });
-}
+};
 
 // This method will be called when Electron has finished
 // initialization and is ready to create browser windows.
@@ -57,7 +57,7 @@ function getPdfPath(dateSerialized, pageNumber) {
   }
 
   return `${config.path}/${month}-${day}-${year.substr(-2)}.PN_A${page}.pdf`;
-}
+};
 
 function checkPages(args, sendClientAlert) {
   const { dateSerialized, dateText } = args;
