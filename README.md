@@ -1,6 +1,6 @@
 # crow
 
-_cathy crow voice: squawk squawk, bitch. get yinz's pages in by 1 a.m.!_
+_cathy crow voice: squawk squawk. get yinz's pages in by 1 a.m.!_
 
 Crow is responsible for taking a "completed newspaper"—one PDF with
 one PDF page per newspaper page—and sending it to the printer.
