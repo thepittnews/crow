@@ -1,8 +1,8 @@
 const { app, BrowserWindow, ipcMain } = require('electron');
 const { existsSync } = require('fs');
 const { execSync } = require('child_process');
-const Client = require('ftp');
 const request = require('request');
+const { Client } = require('ssh2');
 
 const config = require('./config');
 
@@ -50,11 +50,7 @@ function pdftk(command) {
 
 function getPdfPath(dateSerialized, pageNumber) {
   const [year, month, day] = dateSerialized.split('-');
-
-  var page = '';
-  if (pageNumber) {
-    page = `.${pageNumber}`;
-  }
+  const page = pageNumber ? `.${pageNumber}` : '';
 
   return `${config.path}/${month}-${day}-${year.substr(-2)}.PN_A${page}.pdf`;
 };
@@ -109,31 +105,43 @@ function sendPages(args, sendClientAlert) {
   // send to printer servers
   sendClientAlert({ taskName: `Sending ${pageNumbers} pages to printer`, status: 'pending' });
 
-  //var c = new Client();
-  //c.on('ready', function() {
-    for(var i = 1; i <= pageNumbers; i++) {
-      //var originFilename = getPdfPath(args.dateSerialized, i);
-      //var destFilename = originFilename.split("/");
-      //destFilename = destFilename[destFilename.length - 1];
-      //c.put(originFilename, destFilename, function(e) {
-        //if (e) {
-          //sendClientAlert({ taskName: `> Sending page ${i}`, status: 'fail' });
-          //sendClientAlert({ taskName: `ERROR: ${e}`, status: 'fail' });
-          //sendClientAlert({ taskName: `Sending ${pageNumbers} pages to printer`, status: 'fail' });
-          //return;
-        //}
+  const conn = new Client();
+  const ftpSettings = {
+    host: config.ftp_host,
+    port: 22,
+    username: config.ftp_username,
+    password: config.ftp_password
+  };
+  const errorHandler = (e) => {
+    sendClientAlert({ taskName: `ERROR: ${e}`, status: 'fail' });
+    sendClientAlert({ taskName: `Sending ${pageNumbers} pages to printer`, status: 'fail' });
+  };
+  var currentPageNumber = 0;
 
-        sendClientAlert({ taskName: `> Sending page ${i}`, status: 'success' });
+  conn.on('error', errorHandler);
 
-        if (i === pageNumbers) {
-          //c.end();
+  conn.on('ready', () => {
+    conn.sftp((err, sftp) => {
+      if (err) return errorHandler(err);
+
+      try {
+        for(var i = 1; i <= pageNumbers; i++) {
+          var originFilename = getPdfPath(args.dateSerialized, i);
+          destFilename = originFilename.split("/");
+          destFilename = `uploads/${destFilename[destFilename.length - 1]}`;
+          sftp.fastPut(originFilename, destFilename, () => {
+            if (i >= pageNumbers) {
+              conn.end();
+            }
+          });
         }
-      //});
-    }
-  //});
+      } catch (e) {
+        return errorHandler(e);
+      }
+    });
+  });
 
-  //c.connect({ host: config.ftp_host, port: '', user: config.ftp_user, password: config.ftp_password });
-  //c.on('end', () => {
+  conn.on('close', () => {
     sendClientAlert({ taskName: `Sending ${pageNumbers} pages to printer`, status: 'success' });
 
     // send notification to slack
@@ -155,7 +163,9 @@ function sendPages(args, sendClientAlert) {
       // all done
       sendClientAlert({ taskName: 'SUCCESS', status: 'success' });
     });
-  //});
+  });
+
+  conn.connect(ftpSettings);
 };
 
 ipcMain.on('send-pages', (event, args) => {
