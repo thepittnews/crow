@@ -31,21 +31,24 @@ app.on('ready', createWindow);
 app.on('window-all-closed', () => {
   // On macOS it is common for applications and their menu bar
   // to stay active until the user quits explicitly with Cmd + Q
-  if (process.platform !== 'darwin') {
-    app.quit();
-  }
+  if (process.platform !== 'darwin') app.quit();
 });
 
 app.on('activate', () => {
   // On macOS it's common to re-create a window in the app when the
   // dock icon is clicked and there are no other windows open.
-  if (win === null) {
-    createWindow();
-  }
+  if (win === null) createWindow();
 });
 
 function pdftk(command) {
-  return execSync(`pdftk ${command}`, { env: { PATH: '/usr/local/bin/:/usr/bin/' } }).toString();
+  return new Promise((resolve, reject) => {
+    try {
+      let output = execSync(`pdftk ${command}`, { env: { PATH: '/usr/local/bin/:/usr/bin/' } }).toString();
+      resolve(output);
+    } catch (e) {
+      reject(e);
+    }
+  });
 };
 
 function getPdfPath(dateSerialized, pageNumber) {
@@ -59,9 +62,7 @@ function checkPages(args, sendClientAlert) {
   const { dateSerialized, dateText } = args;
 
   const pdfPath = getPdfPath(dateSerialized);
-  const pdfExists = existsSync(pdfPath);
-
-  if (pdfExists) {
+  if (existsSync(pdfPath)) {
     sendClientAlert({ needsConfirmation: true, dateSerialized, dateText, pdfPath, taskName: `Date: ${dateText}\nExported PDF exists -- are you ready to SEND?` });
   } else {
     sendClientAlert({ taskName: `Exported PDF exists at ${pdfPath}`, status: 'fail' });
@@ -72,81 +73,85 @@ function sendPages(args, sendClientAlert) {
   // ready to get started!
   sendClientAlert({ taskName: 'Exported PDF exists', status: 'success' });
 
-  // get number of pages
-  sendClientAlert({ taskName: `Preparing to read PDF`, status: 'pending' });
-  try {
-    var pageNumbers = pdftk(`${args.pdfPath} dump_data`).split("\n").filter((line) => { return line.includes('NumberOfPages'); });
-    pageNumbers = Number(pageNumbers[0].split('NumberOfPages: ')[1]);
-    sendClientAlert({ taskName: `Preparing to read PDF`, status: 'success' });
-  } catch (e) {
-    sendClientAlert({ taskName: `Preparing to read PDF`, status: 'fail' });
-    sendClientAlert({ taskName: `ERROR: ${e}`, status: 'fail' });
-    return;
-  }
-
-  // split up PDFs up into individual PDFs
-  sendClientAlert({ taskName: `Preparing ${pageNumbers} pages`, status: 'pending' });
-
-  for(var i = 1; i <= pageNumbers; i++) {
-    try {
-      sendClientAlert({ taskName: `> Preparing page ${i}`, status: 'pending' });
-      pdftk(`${args.pdfPath} cat ${i}-${i} output ${getPdfPath(args.dateSerialized, i)}`);
-      sendClientAlert({ taskName: `> Preparing page ${i}`, status: 'success' });
-    } catch (e) {
-      sendClientAlert({ taskName: `> Preparing page ${i}`, status: 'fail' });
+  const getPageNumbers = (args) => {
+    sendClientAlert({ taskName: `Preparing to read PDF`, status: 'pending' });
+    return pdftk(`${args.pdfPath} dump_data`).then((lines) => {
+      pageNumbers = lines.split("\n").filter((line) => { return line.includes('NumberOfPages'); });
+      pageNumbers = Number(pageNumbers[0].split('NumberOfPages: ')[1]);
+      sendClientAlert({ taskName: `Preparing to read PDF`, status: 'success' });
+      return Promise.resolve(pageNumbers);
+    }).catch((e) => {
+      sendClientAlert({ taskName: `Preparing to read PDF`, status: 'fail' });
       sendClientAlert({ taskName: `ERROR: ${e}`, status: 'fail' });
-      sendClientAlert({ taskName: `Preparing ${pageNumbers} pages`, status: 'fail' });
-      return;
-    }
-  }
-
-  sendClientAlert({ taskName: `Preparing ${pageNumbers} pages`, status: 'success' });
-
-  // send to printer servers
-  sendClientAlert({ taskName: `Sending ${pageNumbers} pages to printer`, status: 'pending' });
-
-  const conn = new Client();
-  const ftpSettings = {
-    host: config.ftp_host,
-    port: 22,
-    username: config.ftp_username,
-    password: config.ftp_password
-  };
-  const errorHandler = (e) => {
-    sendClientAlert({ taskName: `ERROR: ${e}`, status: 'fail' });
-    sendClientAlert({ taskName: `Sending ${pageNumbers} pages to printer`, status: 'fail' });
-  };
-  var currentPageNumber = 0;
-
-  conn.on('error', errorHandler);
-
-  conn.on('ready', () => {
-    conn.sftp((err, sftp) => {
-      if (err) return errorHandler(err);
-
-      try {
-        for(var i = 1; i <= pageNumbers; i++) {
-          var originFilename = getPdfPath(args.dateSerialized, i);
-          destFilename = originFilename.split("/");
-          destFilename = `uploads/${destFilename[destFilename.length - 1]}`;
-          sftp.fastPut(originFilename, destFilename, () => {
-            if (i >= pageNumbers) {
-              conn.end();
-            }
-          });
-        }
-      } catch (e) {
-        return errorHandler(e);
-      }
+      return Promise.reject();
     });
-  });
+  };
 
-  conn.on('close', () => {
+  const forEachPage = (pageNumbers, cb) => {
+    return Promise.all(Array.from(Array(pageNumbers)).map((x, i) => { return cb(i + 1); }));
+  };
+
+  const splitPages = (pageNumbers) => {
+    // split up PDFs up into individual PDFs
+    sendClientAlert({ taskName: `Preparing ${pageNumbers} pages`, status: 'pending' });
+
+    return forEachPage(pageNumbers, (pageNumber) => {
+      return pdftk(`${args.pdfPath} cat ${pageNumber}-${pageNumber} output ${getPdfPath(args.dateSerialized, pageNumber)}`)
+      .catch((e) => {
+        sendClientAlert({ taskName: `ERROR: ${e}`, status: 'fail' });
+        sendClientAlert({ taskName: `Preparing ${pageNumbers} pages`, status: 'fail' });
+        return Promise.reject();
+      });
+    }).then(() => {
+      sendClientAlert({ taskName: `Preparing ${pageNumbers} pages`, status: 'success' });
+      return Promise.resolve(pageNumbers);
+    });
+  };
+
+  const transferPages = (pageNumbers) => {
+    const conn = new Client();
+    const ftpSettings = Object.assign({}, { port: 22 }, config.ftp_settings);
+
+    return new Promise((resolve, reject) => {
+      conn.on('error', reject);
+      conn.on('close', reject);
+      conn.on('ready', () => {
+        conn.sftp((err, sftp) => {
+          if (err) return reject(err);
+          resolve(sftp);
+        });
+      });
+      conn.connect(ftpSettings);
+    }).then((sftp) => {
+      return forEachPage(pageNumbers, (pageNumber) => {
+        return new Promise((resolve, reject) => {
+          try {
+            const originFilename = getPdfPath(args.dateSerialized, pageNumber);
+            var destFilename = originFilename.split("/");
+            destFilename = `uploads/${destFilename[destFilename.length - 1]}`;
+            sftp.fastPut(originFilename, destFilename, resolve);
+          } catch (e) {
+            return reject(e);
+          }
+        });
+      });
+    }).then(() => {
+      return new Promise((resolve, reject) => {
+        conn.removeAllListeners('close');
+        conn.on('close', resolve.bind(null, pageNumbers));
+        conn.end();
+      });
+    }).catch((e) => {
+      sendClientAlert({ taskName: `ERROR: ${e}`, status: 'fail' });
+      sendClientAlert({ taskName: `Sending ${pageNumbers} pages to printer`, status: 'fail' });
+      return Promise.reject();
+    });
+  };
+
+  const sendSuccessNotification = (pageNumbers) => {
     sendClientAlert({ taskName: `Sending ${pageNumbers} pages to printer`, status: 'success' });
 
-    // send notification to slack
-    request({
-      method: 'POST',
+    request.post({
       uri: config.slack_url,
       form: {
         payload: JSON.stringify({
@@ -160,22 +165,16 @@ function sendPages(args, sendClientAlert) {
       console.log(response.statusCode);
       console.log(body);
 
-      // all done
       sendClientAlert({ taskName: 'SUCCESS', status: 'success' });
+      return Promise.resolve();
     });
-  });
+  };
 
-  conn.connect(ftpSettings);
+  getPageNumbers(args).then(splitPages).then(transferPages).then(sendSuccessNotification).catch(console.log);
 };
 
 ipcMain.on('send-pages', (event, args) => {
-  const sendClientAlert = (cbArg) => {
-    event.sender.send('send-pages-alert', cbArg);
-  };
+  const sendClientAlert = (cbArg) => { event.sender.send('send-pages-alert', cbArg); };
 
-  if (args.confirmed === true) {
-    sendPages(args, sendClientAlert);
-  } else {
-    checkPages(args, sendClientAlert);
-  }
+  return args.confirmed ? sendPages(args, sendClientAlert) : checkPages(args, sendClientAlert);
 });
