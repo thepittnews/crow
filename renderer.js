@@ -6,6 +6,12 @@ const statusCssMap = {
   'success': 'success'
 };
 
+const enableSendButton = () => {
+  Array.from(document.getElementsByClassName("sendButton"))
+    .filter((el) => { return el.disabled; })[0]
+    .disabled = false;
+};
+
 function getConfirmation(arg) {
   const { dateText, taskName } = arg;
 
@@ -18,20 +24,15 @@ function getConfirmation(arg) {
 
     ipcRenderer.send('send-pages', Object.assign({}, { confirmed: true }, arg));
   } else {
-    Array.from(document.getElementsByClassName("sendButton"))
-    .filter((el) => { return el.disabled; })[0]
-    .disabled = false;
+    enableSendButton();
   }
 };
 
 ipcRenderer.on('send-pages-alert', (event, arg) => {
   const { dateSerialized, needsConfirmation, status, taskName } = arg;
 
-  if (needsConfirmation) {
-    return getConfirmation(arg);
-  }
+  if (needsConfirmation) return getConfirmation(arg);
 
-  const container = document.getElementById('sendStatus');
   const taskId = taskName.split(/[^A-Za-z0-9]/).join("_");
   const element = document.querySelector(`#sendStatus > #${taskId}`);
   const cssClass = `alert alert-${statusCssMap[status]}`;
@@ -39,16 +40,14 @@ ipcRenderer.on('send-pages-alert', (event, arg) => {
   if (element) {
     element.className = cssClass;
   } else {
-    container.insertAdjacentHTML(
+    document.getElementById('sendStatus').insertAdjacentHTML(
       'beforeend',
       `<div class="${cssClass}" role="alert" id="${taskId}">${taskName}</div>`
     );
   }
 
-  if ((taskName === 'SUCCESS' && status === 'success') || (status === 'fail'))  {
-    Array.from(document.getElementsByClassName("sendButton"))
-    .filter((el) => { return el.disabled; })[0]
-    .disabled = false;
+  if ((taskName === 'SUCCESS' && status === 'success') || (status === 'fail')) {
+    enableSendButton();
   }
 });
 
