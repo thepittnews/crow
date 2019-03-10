@@ -40,6 +40,11 @@ app.on('activate', () => {
   if (win === null) createWindow();
 });
 
+ipcMain.on('send-pages', (event, args) => {
+  const sendClientAlert = (cbArg) => { event.sender.send('send-pages-alert', cbArg); };
+  return args.confirmed ? sendPages(args, sendClientAlert) : checkPages(args, sendClientAlert);
+});
+
 function pdftk(command) {
   return new Promise((resolve, reject) => {
     try {
@@ -172,9 +177,3 @@ function sendPages(args, sendClientAlert) {
 
   getPageNumbers(args).then(splitPages).then(transferPages).then(sendSuccessNotification).catch(console.log);
 };
-
-ipcMain.on('send-pages', (event, args) => {
-  const sendClientAlert = (cbArg) => { event.sender.send('send-pages-alert', cbArg); };
-
-  return args.confirmed ? sendPages(args, sendClientAlert) : checkPages(args, sendClientAlert);
-});
