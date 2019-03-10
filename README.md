@@ -24,8 +24,10 @@ inside of the Git respository.
 
 ### Configuration
 
-Crow contains three configuratio variables:
+Crow contains four configuration variables:
 
+- `ftp_settings`: Object containing `host`, `password` and `username`
+  keys with FTP credentials.
 - `path`: Filesystem path where PDFs can be located. Sample PDF
   filenames are `2-6-19.PN_A.pdf` and `10-31-19.PN_A.pdf`.
 - `slack_channel`: Slack channel where notifications should be printed
