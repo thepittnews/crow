@@ -56,11 +56,12 @@ const initializePage = () => {
 
   if (now.getHours() < 6) {
     // We're already in publication day already.
-    dates.push(new Date((new Date()).setDate(now.getDate() - 1)));
-    dates.push(now);
+    dates.push(new Date((new Date()).setDate(now.getDate() - 1)),
+      now);
   } else {
-    dates.push(now);
-    dates.push(new Date((new Date()).setDate(now.getDate() + 1)));
+    dates.push(now,
+      new Date((new Date()).setDate(now.getDate() + 1))
+    );
   }
 
   const container = document.getElementsByClassName('list-group')[0];
