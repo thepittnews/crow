@@ -57,7 +57,7 @@ const checkPages = (args, sendClientAlert) => {
 
   const pdfPath = getPdfPath(dateSerialized);
   if (existsSync(pdfPath)) {
-    sendClientAlert({ needsConfirmation: true, dateSerialized, dateText, pdfPath, taskName: `Date: ${dateText}\nExported PDF exists -- are you ready to SEND?` });
+    sendClientAlert({ needsConfirmation: true, dateSerialized, dateText, pdfPath, taskName: `${dateText}: PDF exists, ready to send pages?` });
   } else {
     sendClientAlert({ taskName: `Exported PDF exists at ${pdfPath}`, status: 'fail' });
   }

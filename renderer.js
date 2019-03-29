@@ -12,7 +12,7 @@ const enableSendButton = () => {
     .disabled = false;
 };
 
-function getConfirmation(arg) {
+const getConfirmation =(arg) => {
   const { dateText, taskName } = arg;
 
   const confirmed = confirm(taskName);
@@ -46,30 +46,25 @@ ipcRenderer.on('send-pages-alert', (event, arg) => {
     );
   }
 
-  if ((taskName === 'SUCCESS' && status === 'success') || (status === 'fail')) {
-    enableSendButton();
-  }
+  if ((taskName === 'SUCCESS' && status === 'success') || (status === 'fail')) enableSendButton();
 });
 
-setProductionDate();
-
-function setProductionDate() {
+const initializePage = () => {
+  // set production dates
   const now = new Date();
-  var date1;
-  var date2;
+  const dates = [];
 
   if (now.getHours() < 6) {
     // We're already in publication day already.
-    date1 = new Date((new Date()).setDate(now.getDate() - 1));
-    date2 = now;
+    dates.push(new Date((new Date()).setDate(now.getDate() - 1)));
+    dates.push(now);
   } else {
-    date1 = now;
-    date2 = new Date((new Date()).setDate(now.getDate() + 1));
+    dates.push(now);
+    dates.push(new Date((new Date()).setDate(now.getDate() + 1)));
   }
 
   const container = document.getElementsByClassName('list-group')[0];
-
-  [date1, date2].forEach((date) => {
+  dates.forEach((date) => {
     const dateText = date.toLocaleString().split(",")[0];
     const dateSerialized = `${date.getFullYear()}-${date.getMonth() + 1}-${date.getDate()}`;
     const dateHTML = `<li class="list-group-item">${dateText}
@@ -77,15 +72,18 @@ function setProductionDate() {
 
     container.insertAdjacentHTML('beforeend', dateHTML);
   });
+
+  // add event listeners
+  Array.from(document.getElementsByClassName("sendButton")).forEach((el) => {
+    el.addEventListener("click", (e) => {
+      const el = e.toElement;
+      const { dateSerialized, dateText } = el.dataset;
+
+      el.disabled = true;
+      document.getElementById("sendStatus").innerHTML = '';
+      ipcRenderer.send('send-pages', { confirmed: false, dateSerialized, dateText });
+    });
+  });
 };
 
-Array.from(document.getElementsByClassName("sendButton")).forEach((el) => {
-  el.addEventListener("click", (e) => {
-    const el = e.toElement;
-    const { dateSerialized, dateText } = el.dataset;
-
-    el.disabled = true;
-    document.getElementById("sendStatus").innerHTML = '';
-    ipcRenderer.send('send-pages', { confirmed: false, dateSerialized, dateText });
-  });
-});
+initializePage();
