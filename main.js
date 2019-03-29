@@ -8,7 +8,7 @@ const config = require('./config');
 
 let win;
 
-function createWindow() {
+const createWindow = () => {
   win = new BrowserWindow({ width: 800, height: 600 });
   win.loadFile('index.html');
   win.webContents.openDevTools();
@@ -45,25 +45,14 @@ ipcMain.on('send-pages', (event, args) => {
   return args.confirmed ? sendPages(args, sendClientAlert) : checkPages(args, sendClientAlert);
 });
 
-function pdftk(command) {
-  return new Promise((resolve, reject) => {
-    try {
-      let output = execSync(`pdftk ${command}`, { env: { PATH: '/usr/local/bin/:/usr/bin/' } }).toString();
-      resolve(output);
-    } catch (e) {
-      reject(e);
-    }
-  });
-};
-
-function getPdfPath(dateSerialized, pageNumber) {
+const getPdfPath = (dateSerialized, pageNumber) => {
   const [year, month, day] = dateSerialized.split('-');
   const page = pageNumber ? `.${pageNumber}` : '';
 
   return `${config.path}/${month}-${day}-${year.substr(-2)}.PN_A${page}.pdf`;
 };
 
-function checkPages(args, sendClientAlert) {
+const checkPages = (args, sendClientAlert) => {
   const { dateSerialized, dateText } = args;
 
   const pdfPath = getPdfPath(dateSerialized);
@@ -74,8 +63,18 @@ function checkPages(args, sendClientAlert) {
   }
 };
 
-function sendPages(args, sendClientAlert) {
-  // ready to get started!
+const pdftk = (command) => {
+  return new Promise((resolve, reject) => {
+    try {
+      let output = execSync(`pdftk ${command}`, { env: { PATH: '/usr/local/bin/:/usr/bin/' } }).toString();
+      resolve(output);
+    } catch (e) {
+      reject(e);
+    }
+  });
+};
+
+const sendPages = (args, sendClientAlert) => {
   sendClientAlert({ taskName: 'Exported PDF exists', status: 'success' });
 
   const getPageNumbers = (args) => {
@@ -97,7 +96,6 @@ function sendPages(args, sendClientAlert) {
   };
 
   const splitPages = (pageNumbers) => {
-    // split up PDFs up into individual PDFs
     sendClientAlert({ taskName: `Preparing ${pageNumbers} pages`, status: 'pending' });
 
     return forEachPage(pageNumbers, (pageNumber) => {
@@ -148,25 +146,21 @@ function sendPages(args, sendClientAlert) {
       });
     }).catch((e) => {
       sendClientAlert({ taskName: `ERROR: ${e}`, status: 'fail' });
-      sendClientAlert({ taskName: `Sending ${pageNumbers} pages to printer`, status: 'fail' });
+      sendClientAlert({ taskName: `Sending ${pageNumbers} pages to the printer`, status: 'fail' });
       return Promise.reject();
     });
   };
 
   const sendSuccessNotification = (pageNumbers) => {
-    sendClientAlert({ taskName: `Sending ${pageNumbers} pages to printer`, status: 'success' });
+    sendClientAlert({ taskName: `Sending ${pageNumbers} pages to the printer`, status: 'success' });
 
     request.post({
-      uri: config.slack_url,
+      uri: config.slack_settings.webhook_url,
       form: {
-        payload: JSON.stringify({
-          channel: config.slack_channel,
-          icon_emoji: ':bird:',
-          text: `Pages sent for ${args.dateText}`,
-          username: 'crow'
-        })
+        payload: JSON.stringify(Object.assign({}, { text: `Pages sent for ${args.dateText}` }, config.slack_settings))
       }
     }, (error, response, body) => {
+      debugger;
       console.log(response.statusCode);
       console.log(body);
 

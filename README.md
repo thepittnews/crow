@@ -5,7 +5,7 @@ _cathy crow voice: squawk squawk. get yinz's pages in by 1 a.m.!_
 Crow is responsible for taking a "completed newspaper"—one PDF with
 one PDF page per newspaper page—and sending it to the printer.
 
-The steps involved are to:
+Crow automates the following steps:
 
 1. Read in the PDF and make sure it is able to be processed.
 2. Split the main PDF into separate PDFs, containing one page each.
@@ -30,6 +30,5 @@ Crow contains four configuration variables:
   keys with FTP credentials.
 - `path`: Filesystem path where PDFs can be located. Sample PDF
   filenames are `2-6-19.PN_A.pdf` and `10-31-19.PN_A.pdf`.
-- `slack_channel`: Slack channel where notifications should be printed
-- `slack_url`: Slack incoming webhook URL where notifications should be
-  POST-ed
+- `slack_settings`: Object containing `channel`, `icon_emoji`,
+  `username` and `webhook_url` keys with Slack information.
