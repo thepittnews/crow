@@ -40,27 +40,8 @@ app.on('activate', () => {
   if (win === null) createWindow();
 });
 
-ipcMain.on('send-pages', (event, args) => {
-  const sendClientAlert = (cbArg) => { event.sender.send('send-pages-alert', cbArg); };
-  return args.confirmed ? sendPages(args, sendClientAlert) : checkPages(args, sendClientAlert);
-});
-
-const getPdfPath = (dateSerialized, pageNumber) => {
-  const [year, month, day] = dateSerialized.split('-');
-  const page = pageNumber ? `.${pageNumber}` : '';
-
-  return `${config.path}/${month}-${day}-${year.substr(-2)}.PN_A${page}.pdf`;
-};
-
-const checkPages = (args, sendClientAlert) => {
-  const { dateSerialized, dateText } = args;
-
-  const pdfPath = getPdfPath(dateSerialized);
-  if (existsSync(pdfPath)) {
-    sendClientAlert({ needsConfirmation: true, dateSerialized, dateText, pdfPath, taskName: `${dateText}: PDF exists, ready to send pages?` });
-  } else {
-    sendClientAlert({ taskName: `Exported PDF exists at ${pdfPath}`, status: 'fail' });
-  }
+const getPdfPath = (selectedFile, pageNumber) => {
+  return selectedFile.replace('PN_A.pdf', `PN_A.${pageNumber}.pdf`);
 };
 
 const pdftk = (command) => {
@@ -74,44 +55,77 @@ const pdftk = (command) => {
   });
 };
 
-const sendPages = (args, sendClientAlert) => {
-  sendClientAlert({ taskName: 'Exported PDF exists', status: 'success' });
+const forEachPage = (pageNumbers, cb) => {
+  return Promise.all(Array.from(Array(pageNumbers)).map((x, i) => { return cb(i + 1); }));
+};
 
-  const getPageNumbers = (args) => {
-    sendClientAlert({ taskName: `Preparing to read PDF`, status: 'pending' });
-    return pdftk(`${args.pdfPath} dump_data`).then((lines) => {
-      pageNumbers = lines.split("\n").filter((line) => { return line.includes('NumberOfPages'); });
+ipcMain.on('send-pages', (event, args) => {
+  const sendClientAlert = (cbArg) => { event.sender.send('send-pages-alert', cbArg); };
+  const fn = args.confirmed ? sendPages : checkPages;
+  return fn(args, sendClientAlert);
+});
+
+const checkPages = (args, sendClientAlert) => {
+  const { selectedFile } = args;
+  const slashSplit = selectedFile.split('/');
+  const dotSplit = slashSplit[slashSplit.length - 1].split('.');
+  const dateSerialized = dotSplit[0];
+
+  if (selectedFile.endsWith('.PN_A.pdf')) {
+    sendClientAlert({ dateSerialized, needsConfirmation: true, selectedFile, taskName: `${dateSerialized}: PDF exists, ready to send pages?` });
+  } else {
+    sendClientAlert({ taskName: `Invalid file: ${selectedFile}`, status: 'fail' });
+  }
+};
+
+class Sender {
+  constructor(dateSerialized, selectedFile, sendClientAlert) {
+    this.dateSerialized = dateSerialized;
+    this.selectedFile = selectedFile;
+    this.sendClientAlert = sendClientAlert;
+    this.pageNumbers = 0;
+  }
+
+  send() {
+    return this._getPageNumbers()
+      .then(this._splitPages.bind(this))
+      .then(this._transferPages.bind(this))
+      .then(this._sendSuccessNotification.bind(this));
+  }
+
+  _getPageNumbers() {
+    this.sendClientAlert({ taskName: `Preparing to read PDF`, status: 'pending' });
+    return pdftk(`${this.selectedFile} dump_data`).then((lines) => {
+      var pageNumbers = lines.split("\n").filter((line) => { return line.includes('NumberOfPages'); });
       pageNumbers = Number(pageNumbers[0].split('NumberOfPages: ')[1]);
-      sendClientAlert({ taskName: `Preparing to read PDF`, status: 'success' });
-      return Promise.resolve(pageNumbers);
+      this.sendClientAlert({ taskName: `Preparing to read PDF`, status: 'success' });
+      this.pageNumbers = pageNumbers;
+
+      return Promise.resolve();
     }).catch((e) => {
-      sendClientAlert({ taskName: `Preparing to read PDF`, status: 'fail' });
-      sendClientAlert({ taskName: `ERROR: ${e}`, status: 'fail' });
+      this.sendClientAlert({ taskName: `Preparing to read PDF`, status: 'fail' });
+      this.sendClientAlert({ taskName: `ERROR: ${e}`, status: 'fail' });
       return Promise.reject();
     });
   };
 
-  const forEachPage = (pageNumbers, cb) => {
-    return Promise.all(Array.from(Array(pageNumbers)).map((x, i) => { return cb(i + 1); }));
-  };
+  _splitPages() {
+    this.sendClientAlert({ taskName: `Preparing ${this.pageNumbers} pages`, status: 'pending' });
 
-  const splitPages = (pageNumbers) => {
-    sendClientAlert({ taskName: `Preparing ${pageNumbers} pages`, status: 'pending' });
-
-    return forEachPage(pageNumbers, (pageNumber) => {
-      return pdftk(`${args.pdfPath} cat ${pageNumber}-${pageNumber} output ${getPdfPath(args.dateSerialized, pageNumber)}`)
+    return forEachPage(this.pageNumbers, (pageNumber) => {
+      return pdftk(`${this.selectedFile} cat ${pageNumber}-${pageNumber} output ${getPdfPath(this.selectedFile, pageNumber)}`)
       .catch((e) => {
-        sendClientAlert({ taskName: `ERROR: ${e}`, status: 'fail' });
-        sendClientAlert({ taskName: `Preparing ${pageNumbers} pages`, status: 'fail' });
+        this.sendClientAlert({ taskName: `Preparing ${this.pageNumbers} pages`, status: 'fail' });
+        this.sendClientAlert({ taskName: `ERROR: ${e}`, status: 'fail' });
         return Promise.reject();
       });
     }).then(() => {
-      sendClientAlert({ taskName: `Preparing ${pageNumbers} pages`, status: 'success' });
-      return Promise.resolve(pageNumbers);
+      this.sendClientAlert({ taskName: `Preparing ${this.pageNumbers} pages`, status: 'success' });
+      return Promise.resolve();
     });
   };
 
-  const transferPages = (pageNumbers) => {
+  _transferPages() {
     const conn = new Client();
     const ftpSettings = Object.assign({}, { port: 22 }, config.ftp_settings);
 
@@ -129,9 +143,9 @@ const sendPages = (args, sendClientAlert) => {
       return forEachPage(pageNumbers, (pageNumber) => {
         return new Promise((resolve, reject) => {
           try {
-            const originFilename = getPdfPath(args.dateSerialized, pageNumber);
+            const originFilename = getPdfPath(this.selectedFile, pageNumber);
             var destFilename = originFilename.split("/");
-            destFilename = `uploads/${destFilename[destFilename.length - 1]}`;
+            destFilename = destFilename[destFilename.length - 1];
             sftp.fastPut(originFilename, destFilename, resolve);
           } catch (e) {
             return reject(e);
@@ -141,33 +155,36 @@ const sendPages = (args, sendClientAlert) => {
     }).then(() => {
       return new Promise((resolve, reject) => {
         conn.removeAllListeners('close');
-        conn.on('close', resolve.bind(null, pageNumbers));
+        conn.on('close', resolve);
         conn.end();
       });
     }).catch((e) => {
-      sendClientAlert({ taskName: `ERROR: ${e}`, status: 'fail' });
-      sendClientAlert({ taskName: `Sending ${pageNumbers} pages to the printer`, status: 'fail' });
+      this.sendClientAlert({ taskName: `ERROR: ${e}`, status: 'fail' });
+      this.sendClientAlert({ taskName: `Sending ${pageNumbers} pages to the printer`, status: 'fail' });
       return Promise.reject();
     });
   };
 
-  const sendSuccessNotification = (pageNumbers) => {
-    sendClientAlert({ taskName: `Sending ${pageNumbers} pages to the printer`, status: 'success' });
+  _sendSuccessNotification() {
+    this.sendClientAlert({ taskName: `Sending ${this.pageNumbers} pages to the printer`, status: 'success' });
 
     request.post({
       uri: config.slack_settings.webhook_url,
       form: {
-        payload: JSON.stringify(Object.assign({}, { text: `Pages sent for ${args.dateText}` }, config.slack_settings))
+        payload: JSON.stringify(Object.assign({}, { text: `Pages sent for ${this.dateSerialized}` }, config.slack_settings))
       }
     }, (error, response, body) => {
       debugger;
       console.log(response.statusCode);
       console.log(body);
 
-      sendClientAlert({ taskName: 'SUCCESS', status: 'success' });
+      this.sendClientAlert({ taskName: 'SUCCESS', status: 'success' });
       return Promise.resolve();
     });
   };
+}
 
-  getPageNumbers(args).then(splitPages).then(transferPages).then(sendSuccessNotification).catch(console.log);
+const sendPages = (args, sendClientAlert) => {
+  const sender = new Sender(args.dateSerialized, args.selectedFile, sendClientAlert);
+  return sender.send().catch(console.log);
 };
