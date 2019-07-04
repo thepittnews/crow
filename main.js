@@ -1,7 +1,7 @@
 const { app, BrowserWindow, ipcMain } = require('electron');
 const { existsSync } = require('fs');
 const { execSync } = require('child_process');
-const request = require('request');
+const request = require('request-promise');
 const Client = require('ftp');
 
 const config = require('./config');
@@ -166,16 +166,14 @@ class Sender {
   _sendSuccessNotification() {
     this.sendClientAlert({ taskName: `Sending ${this.pageNumbers} pages to the printer`, status: 'success' });
 
-    request.post({
+    return request({
+      method: 'POST',
       uri: config.slack_settings.webhook_url,
       form: {
         payload: JSON.stringify(Object.assign({}, { text: `Pages sent for ${this.dateSerialized}` }, config.slack_settings))
       }
-    }, (error, response, body) => {
-      debugger;
-      console.log(response.statusCode);
-      console.log(body);
-
+    })
+    .then(() => {
       this.sendClientAlert({ taskName: 'SUCCESS', status: 'success' });
       return Promise.resolve();
     });
