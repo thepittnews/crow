@@ -2,14 +2,14 @@ const { app, BrowserWindow, ipcMain } = require('electron');
 const { existsSync } = require('fs');
 const { execSync } = require('child_process');
 const request = require('request');
-const { Client } = require('ssh2');
+const Client = require('ftp');
 
 const config = require('./config');
 
 let win;
 
 const createWindow = () => {
-  win = new BrowserWindow({ width: 800, height: 600 });
+  win = new BrowserWindow({ width: 800, height: 800 });
   win.loadFile('index.html');
   win.webContents.openDevTools();
 
@@ -127,29 +127,27 @@ class Sender {
 
   _transferPages() {
     const conn = new Client();
-    const ftpSettings = Object.assign({}, { port: 22 }, config.ftp_settings);
 
     return new Promise((resolve, reject) => {
       conn.on('error', reject);
       conn.on('close', reject);
       conn.on('ready', () => {
-        conn.sftp((err, sftp) => {
-          if (err) return reject(err);
-          resolve(sftp);
-        });
+        resolve(conn);
       });
-      conn.connect(ftpSettings);
-    }).then((sftp) => {
-      return forEachPage(pageNumbers, (pageNumber) => {
+      conn.connect(config.ftp_settings);
+    }).then((conn) => {
+      return forEachPage(this.pageNumbers, (pageNumber) => {
         return new Promise((resolve, reject) => {
-          try {
-            const originFilename = getPdfPath(this.selectedFile, pageNumber);
-            var destFilename = originFilename.split("/");
-            destFilename = destFilename[destFilename.length - 1];
-            sftp.fastPut(originFilename, destFilename, resolve);
-          } catch (e) {
-            return reject(e);
-          }
+          const originFilename = getPdfPath(this.selectedFile, pageNumber);
+          var destFilename = originFilename.split("/");
+          destFilename = destFilename[destFilename.length - 1];
+          conn.put(originFilename, destFilename, (err) => {
+            if (err) {
+              reject(err);
+            } else {
+              resolve();
+            }
+          });
         });
       });
     }).then(() => {
@@ -160,7 +158,7 @@ class Sender {
       });
     }).catch((e) => {
       this.sendClientAlert({ taskName: `ERROR: ${e}`, status: 'fail' });
-      this.sendClientAlert({ taskName: `Sending ${pageNumbers} pages to the printer`, status: 'fail' });
+      this.sendClientAlert({ taskName: `Sending ${this.pageNumbers} pages to the printer`, status: 'fail' });
       return Promise.reject();
     });
   };

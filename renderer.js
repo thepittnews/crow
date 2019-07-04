@@ -1,5 +1,5 @@
-const { ipcRenderer } = require("electron");
-const { dialog } = require('electron').remote;
+const { ipcRenderer, shell, remote: { dialog } } = require("electron");
+const { printerPagesLink } = require('./config');
 
 const statusCssMap = {
   'pending': 'warning',
@@ -7,21 +7,16 @@ const statusCssMap = {
   'success': 'success'
 };
 
-const enableSendButton = () => {
-  document.getElementById("sendButton").disabled = false;
-};
+const enableSendButton = () => document.getElementById("sendButton").disabled = false;
+const addSendStatus = (location, text) => document.getElementById('sendStatus').insertAdjacentHTML(location, text);
 
-const getConfirmation = (arg) => {
-  const { dateSerialized, taskName } = arg;
+const getConfirmation = (args) => {
+  const { dateSerialized, taskName } = args;
 
   const confirmed = confirm(taskName);
   if (confirmed) {
-    document.getElementById('sendStatus').insertAdjacentHTML(
-      'afterbegin',
-      `<h3 style="text-align: center">Run Log for ${dateSerialized}:</h3>`
-    );
-
-    ipcRenderer.send('send-pages', Object.assign({}, { confirmed: true }, arg));
+    addSendStatus('afterbegin', `<h4 class="center">Run Log for ${dateSerialized}:</h4>`);
+    ipcRenderer.send('send-pages', Object.assign({}, { confirmed: true }, args));
   } else {
     enableSendButton();
   }
@@ -38,13 +33,13 @@ ipcRenderer.on('send-pages-alert', (event, args) => {
   if (element) {
     element.className = cssClass;
   } else {
-    document.getElementById('sendStatus').insertAdjacentHTML(
-      'beforeend',
-      `<div class="${cssClass}" role="alert" id="${taskId}">${taskName}</div>`
-    );
+    addSendStatus('beforeend', `<div class="${cssClass}" role="alert" id="${taskId}">${taskName}</div>`);
   }
 
-  if ((taskName === 'SUCCESS' && status === 'success') || (status === 'fail')) enableSendButton();
+  if ((taskName === 'SUCCESS' && status === 'success') || (status === 'fail')) {
+    enableSendButton();
+    addSendStatus('beforeend', `<div class="alert alert-info" role="alert"><a class="alert-link" href="${printerPagesLink}">Check printer pages</a></div>`);
+  }
 });
 
 const initializePage = () => {
@@ -55,6 +50,13 @@ const initializePage = () => {
       e.toElement.disabled = true;
       ipcRenderer.send('send-pages', { confirmed: false, selectedFile: selectedFiles[0] });
     });
+  });
+
+  document.addEventListener('click', function(e) {
+    if (e.target.href) {
+      e.preventDefault();
+      shell.openExternal(e.target.href);
+    }
   });
 };
 
