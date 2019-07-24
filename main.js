@@ -160,7 +160,7 @@ class Sender {
           const originFilename = getPdfPath(this.selectedFile, pageNumber);
           var destFilename = originFilename.split("/");
           destFilename = destFilename[destFilename.length - 1];
-          conn.put(originFilename, `files/${destFilename}`, (err) => { err ? reject(err) : resolve(); });
+          conn.put(originFilename, destFilename, (err) => { err ? reject(err) : resolve(); });
         });
       });
     }).then(() => {
