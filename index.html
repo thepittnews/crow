@@ -5,6 +5,7 @@
     <title>Crow</title>
     <link href="https://stackpath.bootstrapcdn.com/bootstrap/4.2.1/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-GJzZqFGwb1QTTN6wy59ffF1BuGJpLSa9DkKMp0DgiMDm4iYMj70gZWKYbI706tWS" crossorigin="anonymous">
     <link rel="stylesheet" href="https://use.fontawesome.com/releases/v5.6.3/css/all.css" integrity="sha384-UHRtZLI+pbxtHCWp1t77Bi1L4ZtiqrqD80Kn4Z8NTSRyMA2Fd33n5dQ8lWUE00s/" crossorigin="anonymous">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/select2/4.0.7/css/select2.min.css" rel="stylesheet" />
     <style> .center { text-align: center; } </style>
   </head>
   <body>
@@ -17,18 +18,18 @@
             <br>
             If something breaks, Slack Jon.
           </i></small></h5>
-
-          <br>
-
-          <button type="button" class="btn btn-danger" id="sendButton">Select PDF to send</button>
         </div>
 
-        <br>
-
-        <div id="sendStatus"></div>
+        <div class="card" style="width: 100%;">
+          <div class="card-body center" id="sendForm">
+            <button type="button" class="btn btn-primary" id="selectPDFButton">Select PDF to send</button>
+          </div>
+        </div>
       </div>
     </div>
 
+    <script>window.$ = window.jQuery = require('jquery');</script>
+    <script>require('select2')(jQuery)</script>
     <script>require("./renderer");</script>
   </body>
 </html>
