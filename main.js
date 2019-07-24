@@ -42,7 +42,6 @@ app.on('activate', () => {
 
 const forEachPage = (pageNumbers, cb) => Promise.all(pageNumbers.map(cb));
 const getPdfPath = (selectedFile, pageNumber) =>  selectedFile.replace('PN_A.pdf', `PN_A.${pageNumber}.pdf`);
-
 const pdftk = (command) => {
   return new Promise((resolve, reject) => {
     try {
@@ -54,24 +53,13 @@ const pdftk = (command) => {
   });
 };
 
-ipcMain.on('send-pages', (event, args) => {
-  const sendClientAlert = (cbArg) => { event.sender.send('send-pages-alert', cbArg); };
-  const fn = args.confirmed ? sendPages : checkPages;
-  return fn(args, sendClientAlert);
-});
-
-const checkPages = (args, sendClientAlert) => {
-  const checker = new Checker(args.selectedFile, sendClientAlert);
-  return checker.check().catch(console.log);
-};
-
 class Checker {
-  constructor(selectedFile, sendClientAlert) {
+  constructor({ selectedFile }, sendClientAlert) {
     this.selectedFile = selectedFile;
     this.sendClientAlert = sendClientAlert;
   }
 
-  check() {
+  execute() {
     return this._checkFile().then(this._getPageNumbers.bind(this));
   }
 
@@ -104,13 +92,8 @@ class Checker {
   };
 }
 
-const sendPages = (args, sendClientAlert) => {
-  const sender = new Sender(args.dateSerialized, args.selectedFile, args.pageNumbersToSend, sendClientAlert);
-  return sender.send().catch(console.log);
-};
-
 class Sender {
-  constructor(dateSerialized, selectedFile, pageNumbers, sendClientAlert) {
+  constructor({ dateSerialized, selectedFile, pageNumbers }, sendClientAlert) {
     this.dateSerialized = dateSerialized;
     this.selectedFile = selectedFile;
     this.sendClientAlert = sendClientAlert;
@@ -122,7 +105,7 @@ class Sender {
     }
   }
 
-  send() {
+  execute() {
     return this._splitPages()
       .then(this._transferPages.bind(this))
       .then(this._sendSuccessNotification.bind(this));
@@ -192,3 +175,11 @@ class Sender {
     });
   };
 }
+
+ipcMain.on('send-pages', (event, args) => {
+  const execute = (klass, sendClientAlert) => ((args) => (new klass(args, sendClientAlert)).execute().catch(console.log));
+  const sendClientAlert = (cbArg) => { event.sender.send('send-pages-alert', cbArg); };
+
+  const executor = args.confirmed ? Sender : Checker;
+  return execute(executor, sendClientAlert)(args, sendClientAlert);
+});
