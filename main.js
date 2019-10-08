@@ -93,15 +93,15 @@ class Checker {
 }
 
 class Sender {
-  constructor({ dateSerialized, selectedFile, pageNumbers }, sendClientAlert) {
+  constructor({ dateSerialized, selectedFile, pageNumbersToSend }, sendClientAlert) {
     this.dateSerialized = dateSerialized;
     this.selectedFile = selectedFile;
     this.sendClientAlert = sendClientAlert;
 
-    if (Array.isArray(pageNumbers)) {
-      this.pageNumbers = pageNumbers;
+    if (Array.isArray(pageNumbersToSend)) {
+      this.pageNumbers = pageNumbersToSend;
     } else {
-      this.pageNumbers = Array.from({ length: pageNumbers }, (v, k) => { return k + 1; });
+      this.pageNumbers = Array.from({ length: pageNumbersToSend }, (v, k) => { return k + 1; });
     }
   }
 

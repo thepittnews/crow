@@ -29,7 +29,13 @@ const getConfirmation = (args) => {
               <input type="radio" class="form-check-input" id="sendSpecificPages">Specific pages
             </label>
           </div>
+          <div class="form-check">
+            <label class="form-check-label">
+              <input type="radio" class="form-check-input" id="sendExcludePages">Exclude specific pages
+            </label>
+          </div>
           <div id="sendSpecificPagesSelectContainer"></div>
+          <div id="sendExcludePagesSelectContainer"></div>
         </div>
 
         <div class="col-md-6">
@@ -47,6 +53,11 @@ const getConfirmation = (args) => {
     let specificPageNumbers;
     if (document.getElementById('sendSpecificPages').checked) {
       specificPageNumbers = $("select#sendSpecificPagesSelect").val().map(Number);
+    }
+    if (document.getElementById('sendExcludePages').checked) {
+      const pageNumbersArray = Array.from(Array(pageNumbers)).map((v, i) => i + 1);
+      const excludedPageNumbers = $("select#sendExcludePagesSelect").val().map(Number);
+      specificPageNumbers = pageNumbersArray.filter((v) => !excludedPageNumbers.includes(v));
     }
     const pageNumbersToSend = specificPageNumbers || pageNumbers;
 
@@ -93,6 +104,21 @@ const getConfirmation = (args) => {
 
       const pageNumbersOptions = Array.from(Array(pageNumbers)).map((x, i) => { return { id: (i + 1), text: (i + 1) }; });
       $('select#sendSpecificPagesSelect').select2({ data: pageNumbersOptions });
+
+      document.getElementById('sendButton').disabled = false;
+      editionType = 'specific';
+    }
+  });
+
+  document.getElementById('sendExcludePages').addEventListener('click', (e) => {
+    if (e.target.checked) {
+      document.getElementById('sendExcludePagesSelectContainer').insertAdjacentHTML(
+        'afterbegin',
+        '<br><select id="sendExcludePagesSelect" multiple="multiple" style="width: 100%"></select>'
+      );
+
+      const pageNumbersOptions = Array.from(Array(pageNumbers)).map((x, i) => { return { id: (i + 1), text: (i + 1) }; });
+      $('select#sendExcludePagesSelect').select2({ data: pageNumbersOptions });
 
       document.getElementById('sendButton').disabled = false;
       editionType = 'specific';
